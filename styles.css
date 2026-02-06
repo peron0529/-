@@ -1,0 +1,89 @@
+:root {
+  --bg: #0f172a;
+  --panel: #111827;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #22d3ee;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans JP", system-ui, -apple-system, sans-serif;
+  background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.container {
+  width: min(960px, 92%);
+  margin: 0 auto;
+}
+
+.hero {
+  padding: 56px 0 32px;
+}
+
+h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin-bottom: 0.5rem;
+}
+
+.tagline {
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+nav a {
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid #155e75;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+}
+
+.card {
+  background: rgba(17, 24, 39, 0.8);
+  border: 1px solid #1f2937;
+  border-radius: 14px;
+  padding: 1.2rem;
+  margin: 1rem 0;
+}
+
+pre {
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+button {
+  background: var(--accent);
+  color: #082f49;
+  border: 0;
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#output {
+  font-weight: 700;
+  margin-top: 0.8rem;
+}
+
+.footer {
+  color: var(--muted);
+  padding: 2rem 0;
+  text-align: center;
+}
