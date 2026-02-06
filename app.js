@@ -1,410 +1,245 @@
-const runBtn = document.getElementById('runBtn');
-const output = document.getElementById('output');
+const templates = {
+  blank: "-- New Script\n",
+  part: `local part = Instance.new("Part")
+part.Size = Vector3.new(8, 1, 8)
+part.Position = Vector3.new(0, 10, 0)
+part.Anchored = true
+part.Material = Enum.Material.Neon
+part.BrickColor = BrickColor.new("Bright blue")
+part.Parent = workspace
+`,
+  leaderstats: `game.Players.PlayerAdded:Connect(function(player)
+    local leaderstats = Instance.new("Folder")
+    leaderstats.Name = "leaderstats"
+    leaderstats.Parent = player
 
-const luaInput = document.getElementById('luaInput');
-const autocompleteList = document.getElementById('autocompleteList');
-const suggestionDetail = document.getElementById('suggestionDetail');
-const localOutput = document.getElementById('localOutput');
-const runLocalBtn = document.getElementById('runLocalBtn');
-const saveLocalBtn = document.getElementById('saveLocalBtn');
-const clearLocalBtn = document.getElementById('clearLocalBtn');
-const snippetList = document.getElementById('snippetList');
-
-const STORAGE_KEY = 'lua-script-lab-local-code';
-const MAX_SUGGESTIONS = 8;
-
-const robloxSnippets = [
-  {
-    title: '1) ClickDetectorでローカルUI表示',
-    description: 'パーツクリックでGUIの表示をトグルする基本形。',
-    code: `local player = game.Players.LocalPlayer
-local mouse = player:GetMouse()
-local gui = player:WaitForChild("PlayerGui"):WaitForChild("MainGui")
-
-mouse.Button1Down:Connect(function()
-  local target = mouse.Target
-  if target and target:FindFirstChildOfClass("ClickDetector") then
-    gui.Enabled = not gui.Enabled
-  end
-end)`
-  },
-  {
-    title: '2) Shiftキーでダッシュ',
-    description: 'UserInputServiceで入力を拾ってWalkSpeed変更。',
-    code: `local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-
-local normalSpeed = 16
-local dashSpeed = 28
-
-UserInputService.InputBegan:Connect(function(input, processed)
-  if processed then return end
-  if input.KeyCode == Enum.KeyCode.LeftShift then
-    humanoid.WalkSpeed = dashSpeed
-  end
+    local coins = Instance.new("IntValue")
+    coins.Name = "Coins"
+    coins.Value = 0
+    coins.Parent = leaderstats
 end)
+`,
+  remote: `local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local event = ReplicatedStorage:WaitForChild("ExampleEvent")
 
-UserInputService.InputEnded:Connect(function(input)
-  if input.KeyCode == Enum.KeyCode.LeftShift then
-    humanoid.WalkSpeed = normalSpeed
-  end
-end)`
-  },
-  {
-    title: '3) RemoteEventでサーバーへ通知',
-    description: 'LocalScriptから安全にサーバー処理を呼ぶ定番。',
-    code: `local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local event = ReplicatedStorage:WaitForChild("PurchaseItem")
-
-local itemId = "sword_01"
-event:FireServer(itemId)`
-  },
-  {
-    title: '4) ProximityPrompt反応',
-    description: '近接インタラクトのTriggeredイベントを利用。',
-    code: `local player = game.Players.LocalPlayer
-local prompt = workspace:WaitForChild("NPC")
-  :WaitForChild("Head")
-  :WaitForChild("ProximityPrompt")
-
-prompt.Triggered:Connect(function(triggeringPlayer)
-  if triggeringPlayer == player then
-    print("会話を開始")
-  end
-end)`
-  },
-  {
-    title: '5) Tool装備時のアニメ再生',
-    description: 'HumanoidへAnimationTrackをLoadして再生する型。',
-    code: `local tool = script.Parent
-local player = game.Players.LocalPlayer
-
-local anim = Instance.new("Animation")
-anim.AnimationId = "rbxassetid://0000000000"
-
-local track
-
-tool.Equipped:Connect(function()
-  local character = player.Character or player.CharacterAdded:Wait()
-  local humanoid = character:WaitForChild("Humanoid")
-  track = humanoid:LoadAnimation(anim)
-  track:Play()
+event.OnServerEvent:Connect(function(player, message)
+    print(string.format("[%s] %s", player.Name, tostring(message)))
 end)
+`,
+  tool: `local tool = script.Parent
 
-tool.Unequipped:Connect(function()
-  if track then
-    track:Stop()
-  end
-end)`
-  }
-];
-
-const luaKeywords = [
-  'and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for', 'function', 'if',
-  'in', 'local', 'nil', 'not', 'or', 'repeat', 'return', 'then', 'true', 'until', 'while',
-  'pairs', 'ipairs', 'print', 'tostring', 'tonumber', 'math', 'table', 'string'
-];
-
-const robloxKeywords = [
-  'game', 'workspace', 'script', 'Enum', 'Instance', 'wait', 'task.wait',
-  'Players', 'LocalPlayer', 'CharacterAdded', 'Humanoid', 'UserInputService',
-  'ContextActionService', 'ReplicatedStorage', 'RemoteEvent', 'ProximityPrompt',
-  'Mouse', 'GetService', 'WaitForChild', 'FireServer', 'OnClientEvent'
-];
-
-const keywordPool = [...new Set([...luaKeywords, ...robloxKeywords])];
-const snippetAutocompletePool = robloxSnippets.map((snippet, index) => ({
-  label: `local-${index + 1}-${snippet.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-  snippet
-}));
-
-runBtn?.addEventListener('click', () => {
-  output.textContent = '実行結果: 15（for文で1〜5を合計）';
-});
-
-const setLocalOutput = (message) => {
-  if (localOutput) localOutput.textContent = message;
-};
-
-const setSuggestionDetail = (text) => {
-  if (suggestionDetail) suggestionDetail.textContent = text;
-};
-
-const safeStorageGet = (key) => {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    setLocalOutput('出力: ブラウザ設定により保存データを読み込めませんでした。');
-    return null;
-  }
-};
-
-const safeStorageSet = (key, value) => {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch {
-    setLocalOutput('出力: ブラウザ設定により保存できませんでした。');
-    return false;
-  }
-};
-
-const safeStorageRemove = (key) => {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    setLocalOutput('出力: ブラウザ設定により削除できませんでした。');
-  }
-};
-
-const loadSavedCode = () => {
-  if (!luaInput) return;
-  const savedCode = safeStorageGet(STORAGE_KEY);
-  if (savedCode) {
-    luaInput.value = savedCode;
-    setLocalOutput('出力: 保存済みスクリプトを読み込みました。');
-  }
-};
-
-const getCurrentWord = () => {
-  if (!luaInput) return '';
-  const position = luaInput.selectionStart;
-  const leftText = luaInput.value.slice(0, position);
-  const matched = leftText.match(/[A-Za-z_.:-]+$/);
-  return matched ? matched[0] : '';
-};
-
-const hideAutocomplete = () => {
-  if (!autocompleteList) return;
-  autocompleteList.innerHTML = '';
-  autocompleteList.classList.remove('visible');
-};
-
-const applySuggestion = (candidate, currentWord) => {
-  if (!luaInput) return;
-  const position = luaInput.selectionStart;
-  const start = position - currentWord.length;
-  luaInput.value = `${luaInput.value.slice(0, start)}${candidate}${luaInput.value.slice(position)}`;
-  const cursor = start + candidate.length;
-  luaInput.setSelectionRange(cursor, cursor);
-  luaInput.focus();
-  hideAutocomplete();
-};
-
-const applySnippetSuggestion = (snippet) => {
-  if (!luaInput) return;
-  luaInput.value = snippet.code;
-  luaInput.focus();
-  hideAutocomplete();
-  setLocalOutput(`出力: 「${snippet.title}」をエディタに読み込みました。`);
-  setSuggestionDetail(`テンプレ説明: ${snippet.description}`);
-  luaInput.classList.add('valid-localscript');
-};
-
-const updateLocalScriptValidity = (currentWord) => {
-  if (!luaInput) return;
-  const matched = snippetAutocompletePool.find((item) => item.label === currentWord.toLowerCase());
-  if (matched) {
-    luaInput.classList.add('valid-localscript');
-    setSuggestionDetail(`テンプレ説明: ${matched.snippet.description}`);
-    return;
-  }
-  luaInput.classList.remove('valid-localscript');
-};
-
-const renderAutocomplete = () => {
-  if (!luaInput || !autocompleteList) return;
-
-  const currentWord = getCurrentWord();
-  updateLocalScriptValidity(currentWord);
-
-  if (currentWord.length < 1) {
-    hideAutocomplete();
-    setSuggestionDetail('候補を選ぶと、ここにテンプレート説明が表示されます。');
-    return;
-  }
-
-  const currentLower = currentWord.toLowerCase();
-  const snippetSuggestions = snippetAutocompletePool
-    .filter((item) => item.label.startsWith(currentLower))
-    .slice(0, MAX_SUGGESTIONS);
-
-  const keywordSuggestions = keywordPool
-    .filter((item) => item.toLowerCase().startsWith(currentLower) && item !== currentWord)
-    .slice(0, MAX_SUGGESTIONS);
-
-  if (!snippetSuggestions.length && !keywordSuggestions.length) {
-    hideAutocomplete();
-    setSuggestionDetail('一致する候補はありません。');
-    return;
-  }
-
-  autocompleteList.innerHTML = '';
-
-  snippetSuggestions.forEach((item) => {
-    const li = document.createElement('li');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'autocomplete-item';
-    button.dataset.kind = 'snippet';
-    button.dataset.label = item.label;
-    button.textContent = `${item.label}（テンプレ）`;
-    button.addEventListener('mouseenter', () => {
-      setSuggestionDetail(`テンプレ説明: ${item.snippet.description}`);
-    });
-    button.addEventListener('focus', () => {
-      setSuggestionDetail(`テンプレ説明: ${item.snippet.description}`);
-    });
-    button.addEventListener('mousedown', (event) => {
-      event.preventDefault();
-      applySnippetSuggestion(item.snippet);
-    });
-    li.appendChild(button);
-    autocompleteList.appendChild(li);
-  });
-
-  keywordSuggestions.forEach((candidate) => {
-    const li = document.createElement('li');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'autocomplete-item';
-    button.dataset.kind = 'keyword';
-    button.textContent = candidate;
-    button.addEventListener('mousedown', (event) => {
-      event.preventDefault();
-      applySuggestion(candidate, currentWord);
-    });
-    li.appendChild(button);
-    autocompleteList.appendChild(li);
-  });
-
-  autocompleteList.classList.add('visible');
-};
-
-const renderSnippets = () => {
-  if (!snippetList || !luaInput) return;
-  snippetList.innerHTML = '';
-
-  robloxSnippets.forEach((snippet) => {
-    const article = document.createElement('article');
-    article.className = 'snippet-card';
-
-    const title = document.createElement('h3');
-    title.textContent = snippet.title;
-
-    const desc = document.createElement('p');
-    desc.className = 'snippet-description';
-    desc.textContent = snippet.description;
-
-    const pre = document.createElement('pre');
-    pre.textContent = snippet.code;
-
-    const button = document.createElement('button');
-    button.className = 'secondary';
-    button.textContent = 'このテンプレをエディタへ挿入';
-    button.addEventListener('click', () => applySnippetSuggestion(snippet));
-
-    article.append(title, desc, pre, button);
-    snippetList.appendChild(article);
-  });
-
-  if (!snippetList.children.length) {
-    snippetList.textContent = 'テンプレートの読み込みに失敗しました。再読み込みしてください。';
-  }
-};
-
-saveLocalBtn?.addEventListener('click', () => {
-  if (!luaInput) return;
-  if (safeStorageSet(STORAGE_KEY, luaInput.value)) {
-    setLocalOutput('出力: スクリプトをブラウザに保存しました。');
-  }
-});
-
-clearLocalBtn?.addEventListener('click', () => {
-  if (!luaInput) return;
-  luaInput.value = '';
-  safeStorageRemove(STORAGE_KEY);
-  luaInput.classList.remove('valid-localscript');
-  hideAutocomplete();
-  setSuggestionDetail('候補を選ぶと、ここにテンプレート説明が表示されます。');
-  setLocalOutput('出力: エディタ内容をクリアしました。');
-});
-
-runLocalBtn?.addEventListener('click', () => {
-  if (!luaInput) return;
-
-  const script = luaInput.value.trim();
-  if (!script) {
-    setLocalOutput('出力: 実行するLuaコードを入力してください。');
-    return;
-  }
-
-  if (!window.fengari || typeof window.fengari.load !== 'function') {
-    setLocalOutput('出力: Lua実行エンジンの読み込みに失敗しました。ネットワーク状態を確認してください。');
-    return;
-  }
-
-  const wrappedScript = `
-local __out = {}
-local function print(...)
-  local parts = {}
-  for i = 1, select('#', ...) do
-    parts[#parts + 1] = tostring(select(i, ...))
-  end
-  __out[#__out + 1] = table.concat(parts, "\t")
+local function onActivated()
+    local character = tool.Parent
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.WalkSpeed = 24
+        task.delay(3, function()
+            humanoid.WalkSpeed = 16
+        end)
+    end
 end
 
-${script}
+tool.Activated:Connect(onActivated)
+`,
+};
 
-return table.concat(__out, "\n")
-`;
+const seedExplorer = {
+  name: "game",
+  className: "DataModel",
+  children: [
+    {
+      name: "Workspace",
+      className: "Workspace",
+      children: [
+        { name: "Baseplate", className: "Part" },
+        { name: "SpawnLocation", className: "SpawnLocation" },
+      ],
+    },
+    {
+      name: "ServerScriptService",
+      className: "ServerScriptService",
+      children: [{ name: "Main.server.lua", className: "Script", template: "leaderstats" }],
+    },
+    {
+      name: "ReplicatedStorage",
+      className: "ReplicatedStorage",
+      children: [{ name: "ExampleEvent", className: "RemoteEvent", template: "remote" }],
+    },
+  ],
+};
 
-  try {
-    const result = window.fengari.load(wrappedScript)();
-    const text = result ? String(result) : '(出力なし)';
-    setLocalOutput(`出力:\n${text}`);
-  } catch (error) {
-    setLocalOutput(`出力: 実行エラー\n${error}`);
-  }
-});
+const editor = document.getElementById("editor");
+const lineNumbers = document.getElementById("lineNumbers");
+const statusBar = document.getElementById("statusBar");
+const tabs = document.getElementById("tabs");
+const output = document.getElementById("output");
+const explorerTree = document.getElementById("explorerTree");
+const properties = document.getElementById("properties");
+const templateSelect = document.getElementById("templateSelect");
+const loadTemplateBtn = document.getElementById("loadTemplateBtn");
+const newTabBtn = document.getElementById("newTabBtn");
+const saveLocalBtn = document.getElementById("saveLocalBtn");
+const copyCodeBtn = document.getElementById("copyCodeBtn");
+const clearOutputBtn = document.getElementById("clearOutputBtn");
+const runBtn = document.getElementById("runBtn");
+const stopBtn = document.getElementById("stopBtn");
+const insertPartBtn = document.getElementById("insertPartBtn");
+const insertSpawnBtn = document.getElementById("insertSpawnBtn");
+const mockPart = document.getElementById("mockPart");
+const mockSpawn = document.getElementById("mockSpawn");
 
-luaInput?.addEventListener('input', renderAutocomplete);
-luaInput?.addEventListener('click', renderAutocomplete);
-luaInput?.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
-    hideAutocomplete();
-  }
+let activeTabId = null;
+let tabsState = [{ id: crypto.randomUUID(), name: "Main.server.lua", code: templates.leaderstats }];
+let simulationRunning = false;
 
-  if (event.key === 'Tab' && autocompleteList?.classList.contains('visible')) {
-    const firstButton = autocompleteList.querySelector('.autocomplete-item');
-    const currentWord = getCurrentWord();
-    if (!firstButton || !currentWord) return;
+function logOutput(message) {
+  const now = new Date().toLocaleTimeString("ja-JP");
+  output.textContent += `[${now}] ${message}\n`;
+  output.scrollTop = output.scrollHeight;
+}
 
-    event.preventDefault();
-    if (firstButton.dataset.kind === 'snippet') {
-      const match = snippetAutocompletePool.find((item) => item.label === firstButton.dataset.label);
-      if (match) {
-        applySnippetSuggestion(match.snippet);
-        return;
-      }
+function renderLineNumbers() {
+  const total = Math.max(editor.value.split("\n").length, 1);
+  lineNumbers.innerHTML = Array.from({ length: total }, (_, i) => `<span>${i + 1}</span>`).join("");
+  const currentLine = editor.value.slice(0, editor.selectionStart).split("\n").length;
+  const lineStart = editor.value.lastIndexOf("\n", editor.selectionStart - 1);
+  const col = editor.selectionStart - lineStart;
+  statusBar.textContent = simulationRunning ? `Playing | Ln ${currentLine}, Col ${col}` : `Edit | Ln ${currentLine}, Col ${col}`;
+}
+
+function renderTabs() {
+  tabs.innerHTML = "";
+  tabsState.forEach((tab) => {
+    const button = document.createElement("button");
+    button.textContent = tab.name;
+    button.className = tab.id === activeTabId ? "tab active" : "tab";
+    button.addEventListener("click", () => switchTab(tab.id));
+    tabs.appendChild(button);
+  });
+}
+
+function switchTab(tabId) {
+  const tab = tabsState.find((item) => item.id === tabId);
+  if (!tab) return;
+  activeTabId = tabId;
+  editor.value = tab.code;
+  renderTabs();
+  renderLineNumbers();
+  logOutput(`タブ切り替え: ${tab.name}`);
+}
+
+function upsertActiveTabCode() {
+  const tab = tabsState.find((item) => item.id === activeTabId);
+  if (tab) tab.code = editor.value;
+}
+
+function createTab(name, templateKey = "blank") {
+  const tab = { id: crypto.randomUUID(), name, code: templates[templateKey] || templates.blank };
+  tabsState.push(tab);
+  switchTab(tab.id);
+}
+
+function renderExplorerNode(node, depth = 0, path = "") {
+  const currentPath = path ? `${path}.${node.name}` : node.name;
+  const item = document.createElement("li");
+  item.className = "tree-item";
+  item.style.paddingLeft = `${depth * 12 + 8}px`;
+  item.textContent = `${node.name} (${node.className})`;
+  item.addEventListener("click", (event) => {
+    event.stopPropagation();
+    properties.innerHTML = `<div><strong>Name:</strong> ${node.name}</div><div><strong>ClassName:</strong> ${node.className}</div><div><strong>Path:</strong> ${currentPath}</div>`;
+    if (node.template) {
+      createTab(node.name, node.template);
+      logOutput(`Explorer から ${node.name} を開きました`);
     }
-    applySuggestion(firstButton.textContent || '', currentWord);
+  });
+  explorerTree.appendChild(item);
+
+  if (node.children) {
+    node.children.forEach((child) => renderExplorerNode(child, depth + 1, currentPath));
   }
+}
+
+function setSimulationState(isRunning) {
+  simulationRunning = isRunning;
+  document.body.classList.toggle("playing", simulationRunning);
+  logOutput(simulationRunning ? "プレイ開始 (Mock)" : "プレイ停止");
+  renderLineNumbers();
+}
+
+loadTemplateBtn.addEventListener("click", () => {
+  editor.value = templates[templateSelect.value];
+  upsertActiveTabCode();
+  renderLineNumbers();
+  logOutput(`テンプレート適用: ${templateSelect.value}`);
 });
 
-document.addEventListener('click', (event) => {
-  if (!autocompleteList || !luaInput) return;
-  if (event.target !== luaInput && !autocompleteList.contains(event.target)) {
-    hideAutocomplete();
-  }
+newTabBtn.addEventListener("click", () => createTab(`Script${tabsState.length + 1}.lua`, "blank"));
+
+saveLocalBtn.addEventListener("click", () => {
+  upsertActiveTabCode();
+  localStorage.setItem("luau-web-studio-tabs", JSON.stringify(tabsState));
+  localStorage.setItem("luau-web-studio-active", activeTabId);
+  logOutput("ローカル保存しました");
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-  renderSnippets();
-  loadSavedCode();
-  renderAutocomplete();
+copyCodeBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(editor.value);
+    copyCodeBtn.textContent = "Copied";
+    logOutput("コードをコピーしました");
+  } catch {
+    copyCodeBtn.textContent = "Copy failed";
+    logOutput("コピー失敗");
+  }
+  setTimeout(() => {
+    copyCodeBtn.textContent = "Copy";
+  }, 1200);
 });
+
+clearOutputBtn.addEventListener("click", () => {
+  output.textContent = "";
+});
+
+runBtn.addEventListener("click", () => setSimulationState(true));
+stopBtn.addEventListener("click", () => setSimulationState(false));
+
+insertPartBtn.addEventListener("click", () => {
+  mockPart.classList.toggle("visible");
+  logOutput(mockPart.classList.contains("visible") ? "Viewport に Part を追加" : "Viewport の Part を削除");
+});
+
+insertSpawnBtn.addEventListener("click", () => {
+  mockSpawn.classList.toggle("visible");
+  logOutput(mockSpawn.classList.contains("visible") ? "Viewport に SpawnLocation を追加" : "Viewport の SpawnLocation を削除");
+});
+
+editor.addEventListener("input", () => {
+  upsertActiveTabCode();
+  renderLineNumbers();
+});
+editor.addEventListener("click", renderLineNumbers);
+editor.addEventListener("keyup", renderLineNumbers);
+editor.addEventListener("scroll", () => {
+  lineNumbers.scrollTop = editor.scrollTop;
+});
+
+(function bootstrap() {
+  const savedTabs = localStorage.getItem("luau-web-studio-tabs");
+  const savedActive = localStorage.getItem("luau-web-studio-active");
+
+  if (savedTabs) {
+    try {
+      const parsed = JSON.parse(savedTabs);
+      if (Array.isArray(parsed) && parsed.length) tabsState = parsed;
+    } catch {
+      logOutput("保存データ読み込み失敗。初期状態で起動");
+    }
+  }
+
+  renderExplorerNode(seedExplorer);
+  renderTabs();
+  switchTab(savedActive || tabsState[0].id);
+  renderLineNumbers();
+  logOutput("Luau Web Studio ready");
+})();
