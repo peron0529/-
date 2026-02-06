@@ -1,3 +1,4 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
 diff --git a/README.md b/README.md
 new file mode 100644
 index 0000000000000000000000000000000000000000..d9ade4582cfd28bdf0ca3ea28968d1da5585ad43
@@ -17,3 +18,6 @@ index 0000000000000000000000000000000000000000..d9ade4582cfd28bdf0ca3ea28968d1da
 +- `index.html` : 画面本体
 +- `styles.css` : スタイル
 +- `app.js` : ボタン押下の簡易デモ
+ 
+EOF
+)
