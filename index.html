@@ -46,11 +46,14 @@ print(total) -- 15</code></pre>
     <section id="editor" class="card">
       <h2>ローカルスクリプトエディタ</h2>
       <p>ブラウザ上でLuaスクリプトを書いて実行できます（入力内容はブラウザに保存されます）。</p>
-      <textarea id="luaInput" spellcheck="false">local total = 0
+      <div class="editor-shell">
+        <textarea id="luaInput" spellcheck="false">local total = 0
 for i = 1, 10 do
   total = total + i
 end
 print("sum", total)</textarea>
+        <ul id="autocompleteList" class="autocomplete-list" aria-live="polite"></ul>
+      </div>
       <div class="editor-actions">
         <button id="runLocalBtn">ローカルスクリプトを実行</button>
         <button id="saveLocalBtn" class="secondary">保存</button>
@@ -61,7 +64,7 @@ print("sum", total)</textarea>
 
     <section id="roblox" class="card">
       <h2>Roblox LocalScriptテンプレート集</h2>
-      <p>「全部」を網羅するのは難しいので、実際によく使うパターンを厳選して入れています。クリックでエディタに読み込めます。</p>
+      <p>実際によく使うパターンを厳選して入れています。クリックでエディタに読み込めます。</p>
       <div id="snippetList" class="snippet-list" aria-live="polite"></div>
     </section>
 
