@@ -117,6 +117,11 @@ const robloxKeywords = [
 
 const autocompletePool = [...new Set([...luaKeywords, ...robloxKeywords])];
 
+const snippetAutocompletePool = robloxSnippets.map((snippet, index) => ({
+  label: `local-${index + 1}-${snippet.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+  snippet
+}));
+
 runBtn?.addEventListener('click', () => {
   output.textContent = '実行結果: 15（for文で1〜5を合計）';
 });
@@ -195,6 +200,15 @@ const applySuggestion = (candidate, currentWord) => {
   hideAutocomplete();
 };
 
+const applySnippetSuggestion = (snippet) => {
+  if (!luaInput) return;
+
+  luaInput.value = snippet.code;
+  luaInput.focus();
+  hideAutocomplete();
+  setLocalOutput(`出力: 「${snippet.title}」をエディタに読み込みました。`);
+};
+
 const renderAutocomplete = () => {
   if (!luaInput || !autocompleteList) return;
 
@@ -205,22 +219,42 @@ const renderAutocomplete = () => {
   }
 
   const currentLower = currentWord.toLowerCase();
-  const suggestions = autocompletePool
+  const snippetSuggestions = snippetAutocompletePool
+    .filter((item) => item.label.startsWith(currentLower))
+    .slice(0, MAX_SUGGESTIONS);
+
+  const keywordSuggestions = autocompletePool
     .filter((item) => item.toLowerCase().startsWith(currentLower) && item !== currentWord)
     .slice(0, MAX_SUGGESTIONS);
 
-  if (!suggestions.length) {
+  if (!snippetSuggestions.length && !keywordSuggestions.length) {
     hideAutocomplete();
     return;
   }
 
   autocompleteList.innerHTML = '';
-  suggestions.forEach((candidate) => {
+  snippetSuggestions.forEach((item) => {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'autocomplete-item';
+    button.textContent = `${item.label}（テンプレ）`;
+    button.dataset.kind = 'snippet';
+    button.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      applySnippetSuggestion(item.snippet);
+    });
+    li.appendChild(button);
+    autocompleteList.appendChild(li);
+  });
+
+  keywordSuggestions.forEach((candidate) => {
     const li = document.createElement('li');
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'autocomplete-item';
     button.textContent = candidate;
+    button.dataset.kind = 'keyword';
     button.addEventListener('mousedown', (event) => {
       event.preventDefault();
       applySuggestion(candidate, currentWord);
@@ -336,6 +370,15 @@ luaInput?.addEventListener('keydown', (event) => {
     const currentWord = getCurrentWord();
     if (firstButton && currentWord) {
       event.preventDefault();
+      if (firstButton.dataset.kind === 'snippet') {
+        const matchedSnippet = snippetAutocompletePool.find(
+          (item) => `${item.label}（テンプレ）` === (firstButton.textContent || '')
+        );
+        if (matchedSnippet) {
+          applySnippetSuggestion(matchedSnippet.snippet);
+          return;
+        }
+      }
       applySuggestion(firstButton.textContent || '', currentWord);
     }
   }
