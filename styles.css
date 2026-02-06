@@ -19,29 +19,20 @@ body {
 }
 
 .container {
-  width: min(960px, 92%);
+  width: min(1080px, 92%);
   margin: 0 auto;
 }
 
-.hero {
-  padding: 56px 0 32px;
-}
+.hero { padding: 56px 0 32px; }
 
 h1 {
   font-size: clamp(2rem, 4vw, 3rem);
   margin-bottom: 0.5rem;
 }
 
-.tagline {
-  color: var(--muted);
-  margin-bottom: 1rem;
-}
+.tagline { color: var(--muted); margin-bottom: 1rem; }
 
-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
+nav { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 
 nav a {
   color: var(--accent);
@@ -83,18 +74,19 @@ button {
   border: 1px solid #334155;
 }
 
-#output {
-  font-weight: 700;
-  margin-top: 0.8rem;
-}
+#output { font-weight: 700; margin-top: 0.8rem; }
 
 .editor-shell {
-  position: relative;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 0.9rem;
 }
+
+.editor-main { position: relative; }
 
 #luaInput {
   width: 100%;
-  min-height: 220px;
+  min-height: 260px;
   resize: vertical;
   border-radius: 10px;
   border: 1px solid #334155;
@@ -105,6 +97,21 @@ button {
   font-size: 0.95rem;
 }
 
+#luaInput.valid-localscript {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5);
+  background: linear-gradient(0deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.08)), #020617;
+}
+
+.suggestion-detail {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #020617;
+  padding: 0.8rem;
+  color: #bfdbfe;
+  min-height: 260px;
+}
+
 .autocomplete-list {
   list-style: none;
   margin: 0;
@@ -112,7 +119,7 @@ button {
   border-radius: 10px;
   border: 1px solid #334155;
   background: #020617;
-  width: min(420px, 90%);
+  width: min(520px, 96%);
   position: absolute;
   left: 0.5rem;
   bottom: 0.6rem;
@@ -120,9 +127,7 @@ button {
   z-index: 2;
 }
 
-.autocomplete-list.visible {
-  display: block;
-}
+.autocomplete-list.visible { display: block; }
 
 .autocomplete-item {
   width: 100%;
@@ -134,25 +139,14 @@ button {
   border-radius: 8px;
 }
 
-.autocomplete-item:hover {
-  background: rgba(34, 211, 238, 0.2);
-}
+.autocomplete-item:hover,
+.autocomplete-item:focus { background: rgba(34, 211, 238, 0.2); }
 
-.editor-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 0.8rem 0;
-}
+.editor-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0.8rem 0; }
 
-#localOutput {
-  white-space: pre-wrap;
-}
+#localOutput { white-space: pre-wrap; }
 
-.snippet-list {
-  display: grid;
-  gap: 0.9rem;
-}
+.snippet-list { display: grid; gap: 0.9rem; }
 
 .snippet-card {
   border: 1px solid #334155;
@@ -161,18 +155,13 @@ button {
   background: rgba(2, 6, 23, 0.65);
 }
 
-.snippet-card h3 {
-  margin-top: 0;
-  margin-bottom: 0.25rem;
-}
+.snippet-card h3 { margin-top: 0; margin-bottom: 0.25rem; }
 
-.snippet-description {
-  margin-top: 0;
-  color: var(--muted);
-}
+.snippet-description { margin-top: 0; color: var(--muted); }
 
-.footer {
-  color: var(--muted);
-  padding: 2rem 0;
-  text-align: center;
+.footer { color: var(--muted); padding: 2rem 0; text-align: center; }
+
+@media (max-width: 860px) {
+  .editor-shell { grid-template-columns: 1fr; }
+  .suggestion-detail { min-height: auto; }
 }
