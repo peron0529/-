@@ -3,6 +3,7 @@ const output = document.getElementById('output');
 
 const luaInput = document.getElementById('luaInput');
 const autocompleteList = document.getElementById('autocompleteList');
+const suggestionDetail = document.getElementById('suggestionDetail');
 const localOutput = document.getElementById('localOutput');
 const runLocalBtn = document.getElementById('runLocalBtn');
 const saveLocalBtn = document.getElementById('saveLocalBtn');
@@ -115,8 +116,7 @@ const robloxKeywords = [
   'Mouse', 'GetService', 'WaitForChild', 'FireServer', 'OnClientEvent'
 ];
 
-const autocompletePool = [...new Set([...luaKeywords, ...robloxKeywords])];
-
+const keywordPool = [...new Set([...luaKeywords, ...robloxKeywords])];
 const snippetAutocompletePool = robloxSnippets.map((snippet, index) => ({
   label: `local-${index + 1}-${snippet.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
   snippet
@@ -127,15 +127,17 @@ runBtn?.addEventListener('click', () => {
 });
 
 const setLocalOutput = (message) => {
-  if (localOutput) {
-    localOutput.textContent = message;
-  }
+  if (localOutput) localOutput.textContent = message;
+};
+
+const setSuggestionDetail = (text) => {
+  if (suggestionDetail) suggestionDetail.textContent = text;
 };
 
 const safeStorageGet = (key) => {
   try {
     return localStorage.getItem(key);
-  } catch (error) {
+  } catch {
     setLocalOutput('出力: ブラウザ設定により保存データを読み込めませんでした。');
     return null;
   }
@@ -145,7 +147,7 @@ const safeStorageSet = (key, value) => {
   try {
     localStorage.setItem(key, value);
     return true;
-  } catch (error) {
+  } catch {
     setLocalOutput('出力: ブラウザ設定により保存できませんでした。');
     return false;
   }
@@ -154,14 +156,13 @@ const safeStorageSet = (key, value) => {
 const safeStorageRemove = (key) => {
   try {
     localStorage.removeItem(key);
-  } catch (error) {
+  } catch {
     setLocalOutput('出力: ブラウザ設定により削除できませんでした。');
   }
 };
 
 const loadSavedCode = () => {
   if (!luaInput) return;
-
   const savedCode = safeStorageGet(STORAGE_KEY);
   if (savedCode) {
     luaInput.value = savedCode;
@@ -171,29 +172,23 @@ const loadSavedCode = () => {
 
 const getCurrentWord = () => {
   if (!luaInput) return '';
-
   const position = luaInput.selectionStart;
   const leftText = luaInput.value.slice(0, position);
-  const matched = leftText.match(/[A-Za-z_.:]+$/);
+  const matched = leftText.match(/[A-Za-z_.:-]+$/);
   return matched ? matched[0] : '';
 };
 
 const hideAutocomplete = () => {
-  if (autocompleteList) {
-    autocompleteList.innerHTML = '';
-    autocompleteList.classList.remove('visible');
-  }
+  if (!autocompleteList) return;
+  autocompleteList.innerHTML = '';
+  autocompleteList.classList.remove('visible');
 };
 
 const applySuggestion = (candidate, currentWord) => {
   if (!luaInput) return;
-
   const position = luaInput.selectionStart;
   const start = position - currentWord.length;
-  const before = luaInput.value.slice(0, start);
-  const after = luaInput.value.slice(position);
-  luaInput.value = `${before}${candidate}${after}`;
-
+  luaInput.value = `${luaInput.value.slice(0, start)}${candidate}${luaInput.value.slice(position)}`;
   const cursor = start + candidate.length;
   luaInput.setSelectionRange(cursor, cursor);
   luaInput.focus();
@@ -202,19 +197,34 @@ const applySuggestion = (candidate, currentWord) => {
 
 const applySnippetSuggestion = (snippet) => {
   if (!luaInput) return;
-
   luaInput.value = snippet.code;
   luaInput.focus();
   hideAutocomplete();
   setLocalOutput(`出力: 「${snippet.title}」をエディタに読み込みました。`);
+  setSuggestionDetail(`テンプレ説明: ${snippet.description}`);
+  luaInput.classList.add('valid-localscript');
+};
+
+const updateLocalScriptValidity = (currentWord) => {
+  if (!luaInput) return;
+  const matched = snippetAutocompletePool.find((item) => item.label === currentWord.toLowerCase());
+  if (matched) {
+    luaInput.classList.add('valid-localscript');
+    setSuggestionDetail(`テンプレ説明: ${matched.snippet.description}`);
+    return;
+  }
+  luaInput.classList.remove('valid-localscript');
 };
 
 const renderAutocomplete = () => {
   if (!luaInput || !autocompleteList) return;
 
   const currentWord = getCurrentWord();
+  updateLocalScriptValidity(currentWord);
+
   if (currentWord.length < 1) {
     hideAutocomplete();
+    setSuggestionDetail('候補を選ぶと、ここにテンプレート説明が表示されます。');
     return;
   }
 
@@ -223,23 +233,32 @@ const renderAutocomplete = () => {
     .filter((item) => item.label.startsWith(currentLower))
     .slice(0, MAX_SUGGESTIONS);
 
-  const keywordSuggestions = autocompletePool
+  const keywordSuggestions = keywordPool
     .filter((item) => item.toLowerCase().startsWith(currentLower) && item !== currentWord)
     .slice(0, MAX_SUGGESTIONS);
 
   if (!snippetSuggestions.length && !keywordSuggestions.length) {
     hideAutocomplete();
+    setSuggestionDetail('一致する候補はありません。');
     return;
   }
 
   autocompleteList.innerHTML = '';
+
   snippetSuggestions.forEach((item) => {
     const li = document.createElement('li');
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'autocomplete-item';
-    button.textContent = `${item.label}（テンプレ）`;
     button.dataset.kind = 'snippet';
+    button.dataset.label = item.label;
+    button.textContent = `${item.label}（テンプレ）`;
+    button.addEventListener('mouseenter', () => {
+      setSuggestionDetail(`テンプレ説明: ${item.snippet.description}`);
+    });
+    button.addEventListener('focus', () => {
+      setSuggestionDetail(`テンプレ説明: ${item.snippet.description}`);
+    });
     button.addEventListener('mousedown', (event) => {
       event.preventDefault();
       applySnippetSuggestion(item.snippet);
@@ -253,8 +272,8 @@ const renderAutocomplete = () => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'autocomplete-item';
-    button.textContent = candidate;
     button.dataset.kind = 'keyword';
+    button.textContent = candidate;
     button.addEventListener('mousedown', (event) => {
       event.preventDefault();
       applySuggestion(candidate, currentWord);
@@ -268,7 +287,6 @@ const renderAutocomplete = () => {
 
 const renderSnippets = () => {
   if (!snippetList || !luaInput) return;
-
   snippetList.innerHTML = '';
 
   robloxSnippets.forEach((snippet) => {
@@ -288,11 +306,7 @@ const renderSnippets = () => {
     const button = document.createElement('button');
     button.className = 'secondary';
     button.textContent = 'このテンプレをエディタへ挿入';
-    button.addEventListener('click', () => {
-      luaInput.value = snippet.code;
-      luaInput.focus();
-      setLocalOutput(`出力: 「${snippet.title}」をエディタに読み込みました。`);
-    });
+    button.addEventListener('click', () => applySnippetSuggestion(snippet));
 
     article.append(title, desc, pre, button);
     snippetList.appendChild(article);
@@ -305,7 +319,6 @@ const renderSnippets = () => {
 
 saveLocalBtn?.addEventListener('click', () => {
   if (!luaInput) return;
-
   if (safeStorageSet(STORAGE_KEY, luaInput.value)) {
     setLocalOutput('出力: スクリプトをブラウザに保存しました。');
   }
@@ -313,10 +326,11 @@ saveLocalBtn?.addEventListener('click', () => {
 
 clearLocalBtn?.addEventListener('click', () => {
   if (!luaInput) return;
-
   luaInput.value = '';
   safeStorageRemove(STORAGE_KEY);
+  luaInput.classList.remove('valid-localscript');
   hideAutocomplete();
+  setSuggestionDetail('候補を選ぶと、ここにテンプレート説明が表示されます。');
   setLocalOutput('出力: エディタ内容をクリアしました。');
 });
 
@@ -368,19 +382,17 @@ luaInput?.addEventListener('keydown', (event) => {
   if (event.key === 'Tab' && autocompleteList?.classList.contains('visible')) {
     const firstButton = autocompleteList.querySelector('.autocomplete-item');
     const currentWord = getCurrentWord();
-    if (firstButton && currentWord) {
-      event.preventDefault();
-      if (firstButton.dataset.kind === 'snippet') {
-        const matchedSnippet = snippetAutocompletePool.find(
-          (item) => `${item.label}（テンプレ）` === (firstButton.textContent || '')
-        );
-        if (matchedSnippet) {
-          applySnippetSuggestion(matchedSnippet.snippet);
-          return;
-        }
+    if (!firstButton || !currentWord) return;
+
+    event.preventDefault();
+    if (firstButton.dataset.kind === 'snippet') {
+      const match = snippetAutocompletePool.find((item) => item.label === firstButton.dataset.label);
+      if (match) {
+        applySnippetSuggestion(match.snippet);
+        return;
       }
-      applySuggestion(firstButton.textContent || '', currentWord);
     }
+    applySuggestion(firstButton.textContent || '', currentWord);
   }
 });
 
