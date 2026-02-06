@@ -1,21 +1,25 @@
-# Lua Script Lab
+# Luau Web Studio
 
-Luaスクリプト学習向けのシンプルな静的サイトです。
-
-## 使い方
-
-`index.html` をブラウザで開くだけで確認できます。
+「Web 版 Roblox Studio っぽい体験」を目指した、Luau スクリプト練習用の静的アプリです。
 
 ## できること
 
-- 学習ロードマップの確認
-- Luaコード例のデモ表示
-- ローカルスクリプトエディタでLuaコードを書いて実行
-- エディタ内容のブラウザ保存（localStorage）
-- Robloxでよく使うLocalScriptテンプレートを一覧から読み込み
+- **Titlebar / Menubar / Ribbon** の Studio 風レイアウト
+- **Viewport (Mock)** で Part / Spawn の表示切替
+- **Explorer / Properties** 連携
+- **Script Editor**（タブ、行番号、Ln/Col、テンプレート適用）
+- **Output** ログ表示
+- **Play/Stop (Mock)** 状態切り替え
+- **localStorage 保存**（開いているタブとアクティブタブ）
 
-## 構成
+## 起動
 
-- `index.html` : 画面本体
-- `styles.css` : スタイル
-- `app.js` : デモ、ローカルエディタ、Robloxテンプレート読み込みロジック
+```bash
+python3 -m http.server 4173
+```
+
+`http://localhost:4173` を開いて利用してください。
+
+## 補足
+
+このプロジェクトは **Roblox Studio 風 UI の練習用ツール** であり、Roblox 本体や executor ではありません。
